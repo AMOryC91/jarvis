@@ -1,222 +1,57 @@
-package com.xap4kter.jarvis;
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.xap4kter.jarvis">
 
-import android.Manifest;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.pm.PackageManager;
-import android.media.AudioManager;
-import android.os.Build;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.speech.tts.TextToSpeech;
-import android.speech.tts.UtteranceProgressListener;
-import android.util.Log;
-import android.view.View;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
-import android.widget.ImageButton;
-import android.widget.TextView;
-import android.widget.Toast;
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.FLASHLIGHT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@drawable/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Jarvis.Purple"
+        android:requestLegacyExternalStorage="true">
 
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustNothing">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
 
-public class MainActivity extends AppCompatActivity {
+        <service
+            android:name=".AssistantService"
+            android:enabled="true"
+            android:exported="false" />
 
-    private static final int PERMISSION_REQUEST_CODE = 100;
-    private static final String TAG = "JarvisMain";
+        <receiver android:name=".ReminderManager$ReminderReceiver" />
 
-    private TextView tvStatus, tvCommand, tvResponse;
-    private FloatingActionButton fabMic;
-    private ImageButton btnSettings;
-    private View waveOverlay;
+    </application>
 
-    private TextToSpeech tts;
-    private AudioManager audioManager;
-    private boolean isListening = false;
-    private boolean isSpeaking = false;
-
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-
-    private final BroadcastReceiver commandReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String command = intent.getStringExtra("command");
-            if (command != null) {
-                tvCommand.setText("Команда: " + command);
-                processCommand(command);
-            }
-        }
-    };
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        tvStatus = findViewById(R.id.tvStatus);
-        tvCommand = findViewById(R.id.tvCommand);
-        tvResponse = findViewById(R.id.tvResponse);
-        fabMic = findViewById(R.id.fabMic);
-        btnSettings = findViewById(R.id.btnSettings);
-        waveOverlay = findViewById(R.id.waveOverlay);
-
-        audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
-
-        tts = new TextToSpeech(this, status -> {
-            if (status == TextToSpeech.SUCCESS) {
-                tts.setLanguage(new Locale("ru"));
-                tts.setSpeechRate(0.9f);
-                // Устанавливаем слушатель прогресса
-                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                    @Override
-                    public void onStart(String utteranceId) {
-                        isSpeaking = true;
-                    }
-
-                    @Override
-                    public void onDone(String utteranceId) {
-                        isSpeaking = false;
-                    }
-
-                    @Override
-                    public void onError(String utteranceId) {
-                        isSpeaking = false;
-                    }
-                });
-            }
-        });
-
-        fabMic.setOnClickListener(v -> {
-            if (isListening) {
-                stopListening();
-            } else {
-                startListening();
-            }
-        });
-
-        btnSettings.setOnClickListener(v -> {
-            Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
-            startActivity(intent);
-        });
-
-        LocalBroadcastManager.getInstance(this).registerReceiver(commandReceiver,
-                new IntentFilter("com.xap4kter.jarvis.COMMAND"));
-
-        startService(new Intent(this, AssistantService.class));
-
-        checkPermissions();
-    }
-
-    private void checkPermissions() {
-        String[] permissions = {
-                Manifest.permission.RECORD_AUDIO,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.CAMERA,
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.ACCESS_WIFI_STATE,
-                Manifest.permission.CHANGE_WIFI_STATE,
-                Manifest.permission.MODIFY_AUDIO_SETTINGS
-        };
-
-        List<String> missingPermissions = new ArrayList<>();
-        for (String p : permissions) {
-            if (ContextCompat.checkSelfPermission(this, p) != PackageManager.PERMISSION_GRANTED) {
-                missingPermissions.add(p);
-            }
-        }
-
-        if (!missingPermissions.isEmpty()) {
-            ActivityCompat.requestPermissions(this, missingPermissions.toArray(new String[0]), PERMISSION_REQUEST_CODE);
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            for (int i = 0; i < permissions.length; i++) {
-                if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(this, "Разрешение " + permissions[i] + " необходимо для работы", Toast.LENGTH_SHORT).show();
-                }
-            }
-        }
-    }
-
-    private void startListening() {
-        isListening = true;
-        tvStatus.setText("Слушаю...");
-        tvStatus.setTextColor(getColor(R.color.status_listening));
-        fabMic.setImageResource(R.drawable.ic_mic_active);
-        waveOverlay.setVisibility(View.VISIBLE);
-        Animation pulse = AnimationUtils.loadAnimation(this, R.anim.pulse);
-        waveOverlay.startAnimation(pulse);
-
-        Intent intent = new Intent("com.xap4kter.jarvis.START_LISTENING");
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
-    }
-
-    private void stopListening() {
-        isListening = false;
-        tvStatus.setText("Ожидание");
-        tvStatus.setTextColor(getColor(R.color.status_idle));
-        fabMic.setImageResource(R.drawable.ic_mic_normal);
-        waveOverlay.clearAnimation();
-        waveOverlay.setVisibility(View.GONE);
-
-        Intent intent = new Intent("com.xap4kter.jarvis.STOP_LISTENING");
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
-    }
-
-    private void processCommand(String command) {
-        tvCommand.setText("Команда: " + command);
-        Intent intent = new Intent("com.xap4kter.jarvis.PROCESS_COMMAND");
-        intent.putExtra("command", command);
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
-    }
-
-    public void showResponse(String response) {
-        mainHandler.post(() -> {
-            tvResponse.setText("Ответ: " + response);
-            if (isVoiceResponseEnabled()) {
-                speak(response);
-            }
-        });
-    }
-
-    private boolean isVoiceResponseEnabled() {
-        return getSharedPreferences("settings", MODE_PRIVATE).getBoolean("voice_response", true);
-    }
-
-    private void speak(String text) {
-        if (tts != null && !isSpeaking) {
-            isSpeaking = true;
-            Bundle params = new Bundle();
-            params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "utteranceId");
-            tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "utteranceId");
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (tts != null) {
-            tts.stop();
-            tts.shutdown();
-        }
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(commandReceiver);
-        super.onDestroy();
-    }
-}
+</manifest>
