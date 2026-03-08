@@ -21,6 +21,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import org.vosk.LibVosk;
 import org.vosk.LogLevel;
 import org.vosk.Model;
+import org.vosk.Recognizer;
 import org.vosk.android.RecognitionListener;
 import org.vosk.android.SpeechService;
 import org.vosk.android.StorageService;
@@ -35,6 +36,7 @@ public class AssistantService extends Service {
     private static final String KEYWORD = "джарвис";
 
     private Model model;
+    private Recognizer recognizer;
     private SpeechService speechService;
     private boolean isListening = false;
     private boolean isSleepMode = false;
@@ -91,6 +93,13 @@ public class AssistantService extends Service {
         public void onPartialResult(String hypothesis) {}
 
         @Override
+        public void onFinalResult(String hypothesis) {
+            // Этот метод вызывается для окончательного результата (может дублировать onResult)
+            // Обрабатываем так же, как onResult
+            onResult(hypothesis);
+        }
+
+        @Override
         public void onError(Exception e) {
             Log.e(TAG, "Vosk error", e);
             if (!isSleepMode) {
@@ -118,19 +127,24 @@ public class AssistantService extends Service {
         StorageService.unpack(this, "model", "model",
                 (model) -> {
                     this.model = model;
-                    initSpeechService();
+                    initRecognizer();
                 },
                 (exception) -> {
                     Log.e(TAG, "Failed to unpack model", exception);
                 });
     }
 
-    private void initSpeechService() {
+    private void initRecognizer() {
         if (model == null) return;
-        speechService = new SpeechService(model, 16000.0f);
-        speechService.startListening(recognitionListener);
-        isListening = true;
-        Log.d(TAG, "SpeechService started");
+        try {
+            recognizer = new Recognizer(model, 16000.0f);
+            speechService = new SpeechService(recognizer);
+            speechService.startListening(recognitionListener);
+            isListening = true;
+            Log.d(TAG, "SpeechService started");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to create recognizer", e);
+        }
     }
 
     private void startListening() {
@@ -192,6 +206,9 @@ public class AssistantService extends Service {
         if (speechService != null) {
             speechService.stop();
             speechService.shutdown();
+        }
+        if (recognizer != null) {
+            recognizer.close();
         }
         if (model != null) {
             model.close();
