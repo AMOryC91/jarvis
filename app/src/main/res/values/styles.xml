@@ -7,16 +7,19 @@
         <item name="colorOnPrimary">@color/white</item>
         <item name="colorSecondary">@color/purple_light</item>
         <item name="colorOnSecondary">@color/black</item>
-        <item name="android:windowBackground">@color/background_light</item>
         <item name="android:statusBarColor">@color/purple_dark</item>
         <item name="android:navigationBarColor">@color/purple_dark</item>
         <item name="android:windowAnimationStyle">@style/WindowAnimations</item>
+        <!-- Фон окна по умолчанию (может быть переопределён в дочерних темах) -->
+        <item name="android:windowBackground">@color/background_light</item>
     </style>
 
+    <!-- Фиолетовая тема с градиентным фоном -->
     <style name="Theme.Jarvis.Purple" parent="Theme.Jarvis">
-        <item name="android:windowBackground">@drawable/bg_gradient</item> <!-- градиент вместо сплошного цвета -->
+        <item name="android:windowBackground">@drawable/bg_gradient</item>
     </style>
 
+    <!-- Чёрная тема -->
     <style name="Theme.Jarvis.Black" parent="Theme.Jarvis">
         <item name="android:windowBackground">@color/black</item>
         <item name="colorPrimary">@color/dark_purple</item>
@@ -24,12 +27,15 @@
         <item name="android:navigationBarColor">@color/black</item>
     </style>
 
+    <!-- Белая тема -->
     <style name="Theme.Jarvis.White" parent="Theme.Jarvis">
         <item name="android:windowBackground">@color/white</item>
         <item name="colorPrimary">@color/purple_primary</item>
         <item name="android:statusBarColor">@color/purple_primary</item>
+        <item name="android:navigationBarColor">@color/purple_primary</item>
     </style>
 
+    <!-- Стеклянная кнопка -->
     <style name="GlassButton" parent="Widget.MaterialComponents.Button">
         <item name="android:background">@drawable/bg_glass_button</item>
         <item name="android:textColor">@color/purple_primary</item>
@@ -38,6 +44,7 @@
         <item name="android:elevation">8dp</item>
     </style>
 
+    <!-- Стеклянная FAB (не используется напрямую в activity_main, но может пригодиться) -->
     <style name="GlassFAB" parent="Widget.MaterialComponents.FloatingActionButton">
         <item name="backgroundTint">@color/glass_background</item>
         <item name="rippleColor">@color/purple_light</item>
@@ -46,6 +53,7 @@
         <item name="borderWidth">0dp</item>
     </style>
 
+    <!-- Анимации переходов -->
     <style name="WindowAnimations">
         <item name="android:activityOpenEnterAnimation">@anim/slide_in_right</item>
         <item name="android:activityOpenExitAnimation">@anim/slide_out_left</item>
