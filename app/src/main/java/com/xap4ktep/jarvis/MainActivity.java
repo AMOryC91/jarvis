@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.media.AudioManager;
 import android.os.Build;
@@ -63,6 +64,21 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Загружаем сохранённую тему ДО вызова super.onCreate
+        SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
+        String theme = prefs.getString("theme", "purple");
+        switch (theme) {
+            case "black":
+                setTheme(R.style.Theme_Jarvis_Black);
+                break;
+            case "white":
+                setTheme(R.style.Theme_Jarvis_White);
+                break;
+            default:
+                setTheme(R.style.Theme_Jarvis_Purple);
+                break;
+        }
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
