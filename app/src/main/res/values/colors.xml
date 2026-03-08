@@ -10,4 +10,8 @@
     <color name="status_listening">#4CAF50</color>
     <color name="status_idle">#9E9E9E</color>
     <color name="glass_background">#80FFFFFF</color>
+    <color name="background_light">#F8F9FA</color>
+    <color name="dark_purple">#4A148C</color>
+    <color name="shadow">#1A000000</color>
+    <color name="glass_stroke">#B3FFFFFF</color>
 </resources>
