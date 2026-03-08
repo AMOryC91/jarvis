@@ -12,6 +12,6 @@
         android:text="J"
         android:textSize="100sp"
         android:textStyle="bold"
-        android:x="55"
-        android:y="140"/>
+        android:x="55dp"
+        android:y="140dp"/>
 </vector>
