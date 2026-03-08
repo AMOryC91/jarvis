@@ -11,13 +11,12 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
-import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -31,6 +30,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
@@ -50,7 +50,6 @@ public class MainActivity extends AppCompatActivity {
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    // BroadcastReceiver для получения команд из сервиса
     private final BroadcastReceiver commandReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -76,15 +75,29 @@ public class MainActivity extends AppCompatActivity {
 
         audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
 
-        // Настройка TTS
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 tts.setLanguage(new Locale("ru"));
                 tts.setSpeechRate(0.9f);
+                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                    @Override
+                    public void onStart(String utteranceId) {
+                        isSpeaking = true;
+                    }
+
+                    @Override
+                    public void onDone(String utteranceId) {
+                        isSpeaking = false;
+                    }
+
+                    @Override
+                    public void onError(String utteranceId) {
+                        isSpeaking = false;
+                    }
+                });
             }
         });
 
-        // Обработчик нажатия на микрофон
         fabMic.setOnClickListener(v -> {
             if (isListening) {
                 stopListening();
@@ -98,14 +111,11 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
-        // Регистрация локального BroadcastReceiver
         LocalBroadcastManager.getInstance(this).registerReceiver(commandReceiver,
                 new IntentFilter("com.xap4kter.jarvis.COMMAND"));
 
-        // Запуск сервиса
         startService(new Intent(this, AssistantService.class));
 
-        // Проверка и запрос разрешений
         checkPermissions();
     }
 
@@ -137,7 +147,6 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQUEST_CODE) {
-            // Проверяем, все ли разрешения даны
             for (int i = 0; i < permissions.length; i++) {
                 if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
                     Toast.makeText(this, "Разрешение " + permissions[i] + " необходимо для работы", Toast.LENGTH_SHORT).show();
@@ -151,12 +160,10 @@ public class MainActivity extends AppCompatActivity {
         tvStatus.setText("Слушаю...");
         tvStatus.setTextColor(getColor(R.color.status_listening));
         fabMic.setImageResource(R.drawable.ic_mic_active);
-        // Запускаем анимацию волн
         waveOverlay.setVisibility(View.VISIBLE);
         Animation pulse = AnimationUtils.loadAnimation(this, R.anim.pulse);
         waveOverlay.startAnimation(pulse);
 
-        // Отправляем команду сервису начать прослушивание
         Intent intent = new Intent("com.xap4kter.jarvis.START_LISTENING");
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
@@ -169,14 +176,12 @@ public class MainActivity extends AppCompatActivity {
         waveOverlay.clearAnimation();
         waveOverlay.setVisibility(View.GONE);
 
-        // Останавливаем прослушивание в сервисе
         Intent intent = new Intent("com.xap4kter.jarvis.STOP_LISTENING");
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
 
     private void processCommand(String command) {
         tvCommand.setText("Команда: " + command);
-        // Отправляем команду в CommandProcessor (через сервис или напрямую)
         Intent intent = new Intent("com.xap4kter.jarvis.PROCESS_COMMAND");
         intent.putExtra("command", command);
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
@@ -198,22 +203,9 @@ public class MainActivity extends AppCompatActivity {
     private void speak(String text) {
         if (tts != null && !isSpeaking) {
             isSpeaking = true;
-            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null);
-            // Слушаем окончание
-            tts.setOnUtteranceProgressListener(new TextToSpeech.OnUtteranceProgressListener() {
-                @Override
-                public void onStart(String utteranceId) { }
-
-                @Override
-                public void onDone(String utteranceId) {
-                    isSpeaking = false;
-                }
-
-                @Override
-                public void onError(String utteranceId) {
-                    isSpeaking = false;
-                }
-            });
+            Bundle params = new Bundle();
+            params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "utteranceId");
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, "utteranceId");
         }
     }
 
