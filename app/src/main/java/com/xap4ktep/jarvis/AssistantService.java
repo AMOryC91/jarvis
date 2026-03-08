@@ -94,8 +94,6 @@ public class AssistantService extends Service {
 
         @Override
         public void onFinalResult(String hypothesis) {
-            // Этот метод вызывается для окончательного результата (может дублировать onResult)
-            // Обрабатываем так же, как onResult
             onResult(hypothesis);
         }
 
@@ -138,7 +136,8 @@ public class AssistantService extends Service {
         if (model == null) return;
         try {
             recognizer = new Recognizer(model, 16000.0f);
-            speechService = new SpeechService(recognizer);
+            // Исправлено: передаём recognizer и частоту дискретизации
+            speechService = new SpeechService(recognizer, 16000.0f);
             speechService.startListening(recognitionListener);
             isListening = true;
             Log.d(TAG, "SpeechService started");
