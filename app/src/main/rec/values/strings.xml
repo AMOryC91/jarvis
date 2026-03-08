@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">Jarvis Assistant</string>
+    <string name="status_idle">Ожидание</string>
+    <string name="status_listening">Слушаю...</string>
+    <string name="command_hint">Скажите команду</string>
+    <string name="response_hint">Ответ появится здесь</string>
+    <string name="settings">Настройки</string>
+    <string name="voice_response">Голосовой ответ</string>
+    <string name="sensitivity">Чувствительность микрофона</string>
+    <string name="theme_purple">Фиолетовая</string>
+    <string name="theme_black">Чёрная</string>
+    <string name="theme_white">Белая</string>
+    <string name="creator">Создатель - @XAP4KTEP</string>
+</resources>
