@@ -21,15 +21,13 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import org.vosk.LibVosk;
 import org.vosk.LogLevel;
 import org.vosk.Model;
-import org.vosk.Recognizer;
 import org.vosk.android.RecognitionListener;
 import org.vosk.android.SpeechService;
 import org.vosk.android.StorageService;
 
-import java.io.IOException;
 import java.util.Locale;
 
-public class AssistantService extends Service implements RecognitionListener {
+public class AssistantService extends Service {
 
     private static final String TAG = "AssistantService";
     private static final String CHANNEL_ID = "JarvisChannel";
@@ -70,6 +68,42 @@ public class AssistantService extends Service implements RecognitionListener {
         }
     };
 
+    private final RecognitionListener recognitionListener = new RecognitionListener() {
+        @Override
+        public void onResult(String hypothesis) {
+            Log.d(TAG, "onResult: " + hypothesis);
+            String text = hypothesis;
+            try {
+                org.json.JSONObject json = new org.json.JSONObject(hypothesis);
+                text = json.optString("text", "").toLowerCase(Locale.getDefault());
+            } catch (org.json.JSONException e) {
+                // ignore
+            }
+            if (text.contains(KEYWORD) || text.contains("джарис") || text.contains("джарвиз")) {
+                String command = text.replaceAll("джарвис|джарис|джарвиз", "").trim();
+                if (!command.isEmpty()) {
+                    sendCommand(command);
+                }
+            }
+        }
+
+        @Override
+        public void onPartialResult(String hypothesis) {}
+
+        @Override
+        public void onError(Exception e) {
+            Log.e(TAG, "Vosk error", e);
+            if (!isSleepMode) {
+                handler.postDelayed(() -> restartListening(), 500);
+            }
+        }
+
+        @Override
+        public void onTimeout() {
+            Log.d(TAG, "Vosk timeout");
+        }
+    };
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -78,45 +112,47 @@ public class AssistantService extends Service implements RecognitionListener {
 
         commandProcessor = new CommandProcessor(this);
 
-        // Инициализация Vosk
         LibVosk.setLogLevel(LogLevel.INFO);
-        try {
-            // Пытаемся загрузить модель из assets (папка model)
-            model = StorageService.unpack(this, "model", "model",
-                    (completed, total) -> Log.d(TAG, "Unpacking " + completed + "/" + total));
-            speechService = new SpeechService(model, 16000.0f);
-            speechService.addListener(this);
-        } catch (IOException e) {
-            Log.e(TAG, "Failed to initialize Vosk", e);
-        }
 
-        LocalBroadcastManager.getInstance(this).registerReceiver(localReceiver,
-                new IntentFilter("com.xap4kter.jarvis.START_LISTENING"));
-        LocalBroadcastManager.getInstance(this).registerReceiver(localReceiver,
-                new IntentFilter("com.xap4kter.jarvis.STOP_LISTENING"));
-        LocalBroadcastManager.getInstance(this).registerReceiver(localReceiver,
-                new IntentFilter("com.xap4kter.jarvis.PROCESS_COMMAND"));
-        LocalBroadcastManager.getInstance(this).registerReceiver(localReceiver,
-                new IntentFilter("com.xap4kter.jarvis.SLEEP_MODE"));
-        LocalBroadcastManager.getInstance(this).registerReceiver(localReceiver,
-                new IntentFilter("com.xap4kter.jarvis.WAKE_UP_MODE"));
+        // Распаковка модели из assets в внутреннее хранилище
+        StorageService.unpack(this, "model", "model",
+                (model) -> {
+                    this.model = model;
+                    initSpeechService();
+                },
+                (exception) -> {
+                    Log.e(TAG, "Failed to unpack model", exception);
+                });
+    }
 
-        startListening();
+    private void initSpeechService() {
+        if (model == null) return;
+        speechService = new SpeechService(model, 16000.0f);
+        speechService.startListening(recognitionListener);
+        isListening = true;
+        Log.d(TAG, "SpeechService started");
     }
 
     private void startListening() {
-        if (!isListening && !isSleepMode && speechService != null) {
+        if (!isSleepMode && speechService != null) {
+            speechService.startListening(recognitionListener);
             isListening = true;
-            speechService.startListening();
             Log.d(TAG, "Started listening");
         }
     }
 
     private void stopListening() {
-        if (isListening && speechService != null) {
-            isListening = false;
+        if (speechService != null) {
             speechService.stop();
+            isListening = false;
             Log.d(TAG, "Stopped listening");
+        }
+    }
+
+    private void restartListening() {
+        if (!isSleepMode && speechService != null) {
+            speechService.stop();
+            speechService.startListening(recognitionListener);
         }
     }
 
@@ -144,53 +180,6 @@ public class AssistantService extends Service implements RecognitionListener {
         intent.putExtra("response", response);
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
-
-    // ========== Реализация RecognitionListener ==========
-
-    @Override
-    public void onResult(String hypothesis) {
-        Log.d(TAG, "onResult: " + hypothesis);
-        // Гипотеза приходит в формате JSON, например: {"text": "привет мир"}
-        // Парсим вручную или используем org.json
-        String text = hypothesis;
-        try {
-            org.json.JSONObject json = new org.json.JSONObject(hypothesis);
-            text = json.optString("text", "").toLowerCase(Locale.getDefault());
-        } catch (org.json.JSONException e) {
-            // Если не JSON, используем как есть
-        }
-        if (text.contains(KEYWORD) || text.contains("джарис") || text.contains("джарвиз")) {
-            String command = text.replaceAll("джарвис|джарис|джарвиз", "").trim();
-            if (!command.isEmpty()) {
-                sendCommand(command);
-            }
-        }
-        // Vosk не требует перезапуска – он продолжает слушать автоматически.
-        // Если нужно остановить после ключевого слова, можно вызвать stop() потом start().
-        // Но для непрерывного прослушивания оставляем как есть.
-    }
-
-    @Override
-    public void onPartialResult(String hypothesis) {
-        // Можно анализировать частичные результаты, но для ключевого слова достаточно полного
-    }
-
-    @Override
-    public void onError(Exception e) {
-        Log.e(TAG, "Vosk error", e);
-        // При ошибке пытаемся перезапустить
-        if (!isSleepMode) {
-            handler.postDelayed(this::startListening, 500);
-        }
-    }
-
-    @Override
-    public void onTimeout() {
-        Log.d(TAG, "Vosk timeout");
-        // Таймаут – просто продолжаем слушать (SpeechService сам перезапустится)
-    }
-
-    // ====================================================
 
     @Nullable
     @Override
