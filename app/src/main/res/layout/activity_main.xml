@@ -8,7 +8,6 @@
     android:background="?android:windowBackground"
     tools:context=".MainActivity">
 
-    <!-- Кнопка настроек (стеклянная) -->
     <ImageButton
         android:id="@+id/btnSettings"
         android:layout_width="48dp"
@@ -21,7 +20,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Статус -->
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="wrap_content"
@@ -38,7 +36,6 @@
         app:layout_constraintTop_toBottomOf="@id/btnSettings"
         android:layout_marginTop="24dp"/>
 
-    <!-- Карточка для команды и ответа -->
     <androidx.cardview.widget.CardView
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -87,7 +84,6 @@
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- Кнопка микрофона с пульсацией -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabMic"
         android:layout_width="wrap_content"
@@ -102,7 +98,6 @@
         app:layout_constraintStart_toStartOf="parent"
         android:layout_marginBottom="100dp"/>
 
-    <!-- Анимация волн (круговая) -->
     <View
         android:id="@+id/waveOverlay"
         android:layout_width="0dp"
@@ -114,7 +109,6 @@
         app:layout_constraintStart_toStartOf="@id/fabMic"
         app:layout_constraintTop_toTopOf="@id/fabMic"/>
 
-    <!-- Подпись создателя -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
