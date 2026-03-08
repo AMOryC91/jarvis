@@ -2,7 +2,6 @@ package com.xap4kter.jarvis;
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.widget.CompoundButton;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.Switch;
@@ -21,20 +20,35 @@ public class SettingsActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Загружаем сохранённую тему ДО вызова super.onCreate и setContentView
+        prefs = getSharedPreferences("settings", MODE_PRIVATE);
+        String theme = prefs.getString("theme", "purple");
+
+        // Устанавливаем тему в зависимости от сохранённого значения
+        switch (theme) {
+            case "black":
+                setTheme(R.style.Theme_Jarvis_Black);
+                break;
+            case "white":
+                setTheme(R.style.Theme_Jarvis_White);
+                break;
+            default:
+                setTheme(R.style.Theme_Jarvis_Purple);
+                break;
+        }
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
 
-        prefs = getSharedPreferences("settings", MODE_PRIVATE);
-
+        // Инициализация элементов интерфейса
         switchVoiceResponse = findViewById(R.id.switchVoiceResponse);
         seekBarSensitivity = findViewById(R.id.seekBarSensitivity);
         tvSensitivityValue = findViewById(R.id.tvSensitivityValue);
         radioGroupTheme = findViewById(R.id.radioGroupTheme);
 
-        // Загрузка настроек
+        // Загрузка текущих настроек
         boolean voiceResponse = prefs.getBoolean("voice_response", true);
         int sensitivity = prefs.getInt("sensitivity", 5);
-        String theme = prefs.getString("theme", "purple");
 
         switchVoiceResponse.setChecked(voiceResponse);
         seekBarSensitivity.setProgress(sensitivity);
@@ -53,11 +67,12 @@ public class SettingsActivity extends AppCompatActivity {
                 break;
         }
 
-        // Слушатели
+        // Слушатель для переключателя голосового ответа
         switchVoiceResponse.setOnCheckedChangeListener((buttonView, isChecked) ->
                 prefs.edit().putBoolean("voice_response", isChecked).apply()
         );
 
+        // Слушатель для ползунка чувствительности
         seekBarSensitivity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -66,26 +81,32 @@ public class SettingsActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onStartTrackingTouch(SeekBar seekBar) { }
+            public void onStartTrackingTouch(SeekBar seekBar) {}
 
             @Override
-            public void onStopTrackingTouch(SeekBar seekBar) { }
+            public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
+        // Слушатель для выбора темы
         radioGroupTheme.setOnCheckedChangeListener((group, checkedId) -> {
             String selectedTheme;
             if (checkedId == R.id.radioBlack) {
                 selectedTheme = "black";
+                // Для чёрной темы используем тёмный режим
                 AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
             } else if (checkedId == R.id.radioWhite) {
                 selectedTheme = "white";
+                // Для белой темы используем светлый режим
                 AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
             } else {
                 selectedTheme = "purple";
+                // Для фиолетовой темы используем системный режим (по умолчанию светлый)
                 AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
             }
+            // Сохраняем выбранную тему
             prefs.edit().putString("theme", selectedTheme).apply();
-            recreate(); // пересоздаём активность для применения темы
+            // Пересоздаём активность, чтобы применить тему
+            recreate();
         });
     }
 }
