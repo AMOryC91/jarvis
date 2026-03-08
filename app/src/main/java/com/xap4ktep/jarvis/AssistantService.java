@@ -12,27 +12,32 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.speech.RecognitionListener;
-import android.speech.RecognizerIntent;
-import android.speech.SpeechRecognizer;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import java.util.ArrayList;
+import org.vosk.LibVosk;
+import org.vosk.LogLevel;
+import org.vosk.Model;
+import org.vosk.Recognizer;
+import org.vosk.android.RecognitionListener;
+import org.vosk.android.SpeechService;
+import org.vosk.android.StorageService;
+
+import java.io.IOException;
 import java.util.Locale;
 
-public class AssistantService extends Service {
+public class AssistantService extends Service implements RecognitionListener {
 
     private static final String TAG = "AssistantService";
     private static final String CHANNEL_ID = "JarvisChannel";
     private static final int NOTIFICATION_ID = 1;
     private static final String KEYWORD = "джарвис";
 
-    private SpeechRecognizer speechRecognizer;
-    private Intent recognizerIntent;
+    private Model model;
+    private SpeechService speechService;
     private boolean isListening = false;
     private boolean isSleepMode = false;
 
@@ -73,90 +78,17 @@ public class AssistantService extends Service {
 
         commandProcessor = new CommandProcessor(this);
 
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
-        speechRecognizer.setRecognitionListener(new RecognitionListener() {
-            @Override
-            public void onReadyForSpeech(Bundle params) {
-                Log.d(TAG, "onReadyForSpeech");
-            }
-
-            @Override
-            public void onBeginningOfSpeech() {
-                Log.d(TAG, "onBeginningOfSpeech");
-            }
-
-            @Override
-            public void onRmsChanged(float rmsdB) {}
-
-            @Override
-            public void onBufferReceived(byte[] buffer) {}
-
-            @Override
-            public void onEndOfSpeech() {
-                Log.d(TAG, "onEndOfSpeech");
-            }
-
-            @Override
-            public void onError(int error) {
-                Log.e(TAG, "onError: " + error);
-                if (!isSleepMode) {
-                    restartListening();
-                }
-            }
-
-            @Override
-            public void onResults(Bundle results) {
-                if (isSleepMode) return;
-                ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                if (matches != null && !matches.isEmpty()) {
-                    for (String text : matches) {
-                        String lowerText = text.toLowerCase(Locale.getDefault());
-                        Log.d(TAG, "Recognized variant: " + lowerText);
-                        if (lowerText.contains(KEYWORD) || lowerText.contains("джарис") || lowerText.contains("джарвиз")) {
-                            String command = lowerText.replaceAll("джарвис|джарис|джарвиз", "").trim();
-                            if (!command.isEmpty()) {
-                                sendCommand(command);
-                            }
-                            break;
-                        }
-                    }
-                }
-                if (!isSleepMode) {
-                    restartListening();
-                }
-            }
-
-            @Override
-            public void onPartialResults(Bundle partialResults) {
-                if (isSleepMode) return;
-                ArrayList<String> matches = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                if (matches != null && !matches.isEmpty()) {
-                    for (String text : matches) {
-                        String lowerText = text.toLowerCase(Locale.getDefault());
-                        if (lowerText.contains(KEYWORD)) {
-                            // Досрочно обнаружили ключевое слово – можно начать новый сеанс для команды
-                            speechRecognizer.cancel();
-                            startListeningForCommand();
-                            return;
-                        }
-                    }
-                }
-            }
-
-            @Override
-            public void onEvent(int eventType, Bundle params) {}
-        });
-
-        recognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU");
-        recognizerIntent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
-        recognizerIntent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5);
-        recognizerIntent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
-        recognizerIntent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 2000);
-        recognizerIntent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1000);
-        recognizerIntent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1000);
-        recognizerIntent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
+        // Инициализация Vosk
+        LibVosk.setLogLevel(LogLevel.INFO);
+        try {
+            // Пытаемся загрузить модель из assets (папка model)
+            model = StorageService.unpack(this, "model", "model",
+                    (completed, total) -> Log.d(TAG, "Unpacking " + completed + "/" + total));
+            speechService = new SpeechService(model, 16000.0f);
+            speechService.addListener(this);
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to initialize Vosk", e);
+        }
 
         LocalBroadcastManager.getInstance(this).registerReceiver(localReceiver,
                 new IntentFilter("com.xap4kter.jarvis.START_LISTENING"));
@@ -173,35 +105,31 @@ public class AssistantService extends Service {
     }
 
     private void startListening() {
-        if (!isListening && !isSleepMode) {
+        if (!isListening && !isSleepMode && speechService != null) {
             isListening = true;
-            speechRecognizer.startListening(recognizerIntent);
+            speechService.startListening();
             Log.d(TAG, "Started listening");
         }
     }
 
-    private void startListeningForCommand() {
-        if (!isListening || isSleepMode) return;
-        speechRecognizer.startListening(recognizerIntent);
-    }
-
     private void stopListening() {
-        if (isListening) {
+        if (isListening && speechService != null) {
             isListening = false;
-            speechRecognizer.stopListening();
+            speechService.stop();
             Log.d(TAG, "Stopped listening");
         }
     }
 
-    private void restartListening() {
-        if (isListening && !isSleepMode) {
-            speechRecognizer.cancel();
-            handler.postDelayed(() -> {
-                if (isListening && !isSleepMode) {
-                    speechRecognizer.startListening(recognizerIntent);
-                }
-            }, 50);
-        }
+    private void enterSleepMode() {
+        isSleepMode = true;
+        stopListening();
+        Log.d(TAG, "Entered sleep mode");
+    }
+
+    private void exitSleepMode() {
+        isSleepMode = false;
+        startListening();
+        Log.d(TAG, "Exited sleep mode");
     }
 
     private void sendCommand(String command) {
@@ -217,17 +145,52 @@ public class AssistantService extends Service {
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
 
-    private void enterSleepMode() {
-        isSleepMode = true;
-        stopListening();
-        Log.d(TAG, "Entered sleep mode");
+    // ========== Реализация RecognitionListener ==========
+
+    @Override
+    public void onResult(String hypothesis) {
+        Log.d(TAG, "onResult: " + hypothesis);
+        // Гипотеза приходит в формате JSON, например: {"text": "привет мир"}
+        // Парсим вручную или используем org.json
+        String text = hypothesis;
+        try {
+            org.json.JSONObject json = new org.json.JSONObject(hypothesis);
+            text = json.optString("text", "").toLowerCase(Locale.getDefault());
+        } catch (org.json.JSONException e) {
+            // Если не JSON, используем как есть
+        }
+        if (text.contains(KEYWORD) || text.contains("джарис") || text.contains("джарвиз")) {
+            String command = text.replaceAll("джарвис|джарис|джарвиз", "").trim();
+            if (!command.isEmpty()) {
+                sendCommand(command);
+            }
+        }
+        // Vosk не требует перезапуска – он продолжает слушать автоматически.
+        // Если нужно остановить после ключевого слова, можно вызвать stop() потом start().
+        // Но для непрерывного прослушивания оставляем как есть.
     }
 
-    private void exitSleepMode() {
-        isSleepMode = false;
-        startListening();
-        Log.d(TAG, "Exited sleep mode");
+    @Override
+    public void onPartialResult(String hypothesis) {
+        // Можно анализировать частичные результаты, но для ключевого слова достаточно полного
     }
+
+    @Override
+    public void onError(Exception e) {
+        Log.e(TAG, "Vosk error", e);
+        // При ошибке пытаемся перезапустить
+        if (!isSleepMode) {
+            handler.postDelayed(this::startListening, 500);
+        }
+    }
+
+    @Override
+    public void onTimeout() {
+        Log.d(TAG, "Vosk timeout");
+        // Таймаут – просто продолжаем слушать (SpeechService сам перезапустится)
+    }
+
+    // ====================================================
 
     @Nullable
     @Override
@@ -237,8 +200,12 @@ public class AssistantService extends Service {
 
     @Override
     public void onDestroy() {
-        if (speechRecognizer != null) {
-            speechRecognizer.destroy();
+        if (speechService != null) {
+            speechService.stop();
+            speechService.shutdown();
+        }
+        if (model != null) {
+            model.close();
         }
         LocalBroadcastManager.getInstance(this).unregisterReceiver(localReceiver);
         handler.removeCallbacksAndMessages(null);
