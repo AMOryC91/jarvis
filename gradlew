@@ -80,11 +80,13 @@ do
     esac
 done
 
-# This is normally unused
-# shellcheck disable=SC2034
+APP_HOME=$( cd "${APP_HOME:-./}" && pwd -P ) || exit
+
+APP_NAME="Gradle"
 APP_BASE_NAME=${0##*/}
-# Discard cd standard output in case $CDPATH is set https://github.com/gradle/gradle/issues/25036
-APP_HOME=$( cd "${APP_HOME:-./}" > /dev/null && pwd -P ) || exit
+
+# Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 
 # Use the maximum available, or set MAX_FD != -1 to use that value.
 MAX_FD=maximum
@@ -140,44 +142,14 @@ fi
 if ! "$cygwin" && ! "$darwin" && ! "$nonstop" ; then
     case $MAX_FD in #(
       max*)
-        # In POSIX sh, ulimit -H cannot be redirected.  Specifically, the output of
-        # ulimit is redirected to a subshell, and the value isn't captured.  So we
-        # have to rely on the fact that the shell can't exit with an error when a
-        # non-matching glob pattern is used.  That is, we try "ulimit -Hn" and if it
-        # fails, we may be running in a strict POSIX shell that doesn't support -H.
-        # If that happens, we fallback to "ulimit -n" and then to "ulimit -n" (the
-        # no -H version) is run, we first capture the output of "ulimit -Hn" which
-        # may or may not work.  Capturing the status code is the reliable way to
-        # check if -H is supported, but unfortunately the POSIX shell only gives us
-        # exit status via $? and $? is cleared immediately after "ulimit -Hn" is
-        # run.  So we capture both stdout and stderr into a temporary file, and
-        # check the exit status of the command that was actually run.  This works
-        # because we can check if the command we ran (explicitly "ulimit -Hn")
-        # failed.  If it failed, we know -H is not supported, and we fallback to
-        # "ulimit -n".  We use a temporary file because we need to capture both
-        # stdout and stderr, and POSIX redirection cannot redirect stdout to a
-        # variable and stderr to a variable at the same time.  We also capture the
-        # exit status via $? because POSIX shells do not give us $? from a command
-        # substitution.  We capture both stdout and stderr because capturing only
-        # stderr in a command substitution would print to stdout and mess up
-        # something else.
-        tmpulimit=$(mktemp)
-        if ulimit -Hn > "$tmpulimit" 2>&1; then
-            MAX_FD=$(<ulimit -Hn)
-        else
-            # Fallback to ulimit -n
-            if ulimit -n > "$tmpulimit" 2>&1; then
-                MAX_FD=$(<ulimit -n)
-            else
-                warn "Could not set max file descriptors"
-                MAX_FD=
-            fi
-        fi
-        rm -f "$tmpulimit" ;;
+        MAX_FD=$( ulimit -H -n ) ||
+            warn "Could not query maximum file descriptor limit"
+    esac
+    case $MAX_FD in  #(
+      '' | soft) :;; #(
       *)
-        ulimit -n "$MAX_FD" 2>/dev/null || {
-            warn "Could not set max file descriptors to $MAX_FD"
-        }
+        ulimit -n "$MAX_FD" ||
+            warn "Could not set maximum file descriptor limit to $MAX_FD"
     esac
 fi
 
