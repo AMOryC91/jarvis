@@ -8,12 +8,6 @@
     android:background="?android:windowBackground"
     tools:context=".MainActivity">
 
-    <!-- Декоративный градиентный фон -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@drawable/bg_gradient"/>
-
     <!-- Кнопка настроек (стеклянная) -->
     <ImageButton
         android:id="@+id/btnSettings"
